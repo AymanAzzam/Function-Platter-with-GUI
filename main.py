@@ -1,11 +1,12 @@
 import sys
+import time
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
-from PySide2.QtCore import Qt 
+from PySide2.QtCore import Qt, QTimer
 
 class CanvasFigure(FigureCanvasQTAgg):
 
@@ -19,20 +20,20 @@ class Form(QDialog):
     def __init__(self,parent = None):
         super(Form, self).__init__(parent)
 
-        ##########          set a Title         ##########
+        ##########          set a Title             ##########
         self.setWindowTitle("Function Plotter")
-
+    
         ##########          Create Widgets          ##########
         self.__CreateWidgets()
-
-        ##########          Change Style            ##########
-        self.__ChangeStyle()
-
+        
         ##########          Get initial plot        ##########
         self.graph = self.sc.axes.plot([], [])[0]
 
         ##########  Create Layout and Add Widgets   ##########
         self.__CraeteLayout()
+
+        ##########          Change Style            ##########
+        self.__ChangeStyle()
         
         ########## Conncet the button to a function ##########
         self.button.clicked.connect(self.Update)
@@ -48,23 +49,35 @@ class Form(QDialog):
         self.sc = CanvasFigure()
         
         ### Labels ###
-        self.function_label = QLabel("y   =")               # Label for the function
-        self.x_min_label = QLabel("Xmin   =")               # Label for the X minium
-        self.x_max_label = QLabel("Xmax   =")               # label for the X maximum
+        self.function_label = QLabel("F(x)")               # Label for the function
+        self.x_min_label = QLabel("Xmin")               # Label for the X minium
+        self.x_max_label = QLabel("Xmax")               # label for the X maximum
         # Label for Messages to user
         self.result_label = QLabel("\nWrite your function then press Draw\n")    
         
 
     def __ChangeStyle(self):
         
-        ## Style for message to user
-        font = QFont("Arial", 16, QFont.Bold)
-        self.result_label.setFont(font)
-        self.result_label.setAlignment(Qt.AlignCenter)
-        self.result_label.setStyleSheet("border :3px solid black;")
+        ## Style for Window
+        self.setStyleSheet("background-color: darkcyan;")
         
-        ## Style for The button
-        #self.button.setStyleSheet("padding :15px")
+        ## Style for message to user
+        user_message = "border :3px solid black; background-color: yellow; font: bold 16pt;"
+        self.result_label.setAlignment(Qt.AlignCenter)
+        self.result_label.setStyleSheet(user_message)
+        
+        ## Style for Edited Texts
+        style_sheet_edit = "background-color: white;"
+        self.function.setStyleSheet(style_sheet_edit)
+        self.x_min.setStyleSheet(style_sheet_edit)
+        self.x_max.setStyleSheet(style_sheet_edit)
+
+        ## Style for Labels
+        style_sheet_label = "font: bold; color: white"
+        self.function_label.setStyleSheet(style_sheet_label)
+        self.x_min_label.setStyleSheet(style_sheet_label)
+        self.x_max_label.setStyleSheet(style_sheet_label)
+        
 
     def __CraeteLayout(self):
 
@@ -95,35 +108,53 @@ class Form(QDialog):
         
     def Update(self):
         ## Validate the user Inputs
+        self.user_message = self.result_label.text()
         xmin,xmax,fx,err = self.__ValidateInputs()
         
         ## return if there is an error
         if err:
+            QTimer.singleShot(2500, self._updateMessage)
             return
+        
+        ## Solving the division by zero problem
+        samples = 500
+        threshold = 0.000000101
+        x = np.linspace(xmin-threshold,xmax+threshold,samples)
+        y = eval(fx)
+
+        ## Solve constant Function
+        try:
+            len(y)
+        except:
+            y = np.full(len(x),y)
 
         ## Update the data
-        x = np.linspace(xmin,xmax)
-        y = eval(fx)
         self.graph.set_data(x,y)
-
+        
         ## Limit the x-axis & y-yaxis
+        threshold2 = 1
         ymin = min(y)
         ymax = max(y)
-        plt.xlim(xmin,xmax)
-        plt.ylim(ymin,ymax)
+        plt.xlim(xmin-threshold2,xmax+threshold2)
+        plt.ylim(ymin-threshold2,ymax+threshold2)
         
         ## Apply the Updates
         self.sc.fig.canvas.draw()
+
+    ## To update the user message after not valid input
+    def _updateMessage(self):
+        self.result_label.setText(self.user_message)
 
     def __ValidateInputs(self):
         
         ## Get the user inputs
         xmin_string = str(self.x_min.text())
         xmax_string = str(self.x_max.text())
-        fx_string = str(self.function.text()).replace("^","**")
+        fx = str(self.function.text())
+        fx_string = fx.replace("^","**")
 
         ## Check the function validation
-        x = 0
+        x = 0.010111
         try:
             eval(fx_string)
         except:
@@ -146,7 +177,7 @@ class Form(QDialog):
             self.result_label.setText(message)
             return 0,0,"",1
 
-        message = "\nSuccessful Drawing\n"
+        message = "\n y = " + fx + " ,   x = [" + xmin_string + ", " + xmax_string + "]\n"
         self.result_label.setText(message)
         
         return xmin,xmax,fx_string,0
